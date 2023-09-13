@@ -1,0 +1,279 @@
+---
+# DockerCluster object referenced by the Cluster object
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DockerCluster
+metadata:
+  name: ${CLUSTER_NAME}
+spec:
+  failureDomains:
+    fd1:
+      controlPlane: true
+    fd2:
+      controlPlane: true
+    fd3:
+      controlPlane: true
+    fd4:
+      controlPlane: false
+    fd5:
+      controlPlane: false
+    fd6:
+      controlPlane: false
+    fd7:
+      controlPlane: false
+    fd8:
+      controlPlane: false
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME}
+  labels:
+    cni: "${CLUSTER_NAME}-crs-0"
+spec:
+  clusterNetwork:
+    services:
+      cidrBlocks: ['10.128.0.0/12']
+    pods:
+      cidrBlocks: ['192.168.0.0/16']
+    serviceDomain: 'cluster.local'
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerCluster
+    name: ${CLUSTER_NAME}
+  controlPlaneRef:
+    kind: KubeadmControlPlane
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    name: "${CLUSTER_NAME}-control-plane"
+---
+# DockerMachineTemplate object referenced by the KubeadmControlPlane object
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DockerMachineTemplate
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  template:
+    spec:
+      extraMounts:
+        - containerPath: "/var/run/docker.sock"
+          hostPath: "/var/run/docker.sock"
+---
+kind: KubeadmControlPlane
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+  labels:
+    kcp-adoption.step2: ""
+spec:
+  replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+  machineTemplate:
+    infrastructureRef:
+      kind: DockerMachineTemplate
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      name: "${CLUSTER_NAME}-control-plane"
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      controllerManager:
+        extraArgs: {enable-hostpath-provisioner: 'true'}
+      apiServer:
+        # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+        certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+    initConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+    joinConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+  version: "${KUBERNETES_VERSION}"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DockerMachineTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      extraMounts:
+        - containerPath: "/var/run/docker.sock"
+          hostPath: "/var/run/docker.sock"
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          criSocket: unix:///var/run/containerd/containerd.sock
+          kubeletExtraArgs:
+            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+---
+# MachineDeployment object
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  clusterName: "${CLUSTER_NAME}"
+  replicas: ${WORKER_MACHINE_COUNT}
+  selector:
+    matchLabels:
+  template:
+    spec:
+      clusterName: "${CLUSTER_NAME}"
+      version: "${KUBERNETES_VERSION}"
+      bootstrap:
+        configRef:
+          name: "${CLUSTER_NAME}-md-0"
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+      infrastructureRef:
+        name: "${CLUSTER_NAME}-md-0"
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: DockerMachineTemplate
+      failureDomain: fd4
+---
+# ClusterResourceSet object with
+# a selector that targets all the Cluster with label cni=${CLUSTER_NAME}-crs-0
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name:  "${CLUSTER_NAME}-crs-0"
+spec:
+  strategy: ApplyOnce
+  clusterSelector:
+    matchLabels:
+      cni: "${CLUSTER_NAME}-crs-0"
+  resources:
+    - name: "cni-${CLUSTER_NAME}-crs-0"
+      kind: ConfigMap
+---
+# ConfigMap object referenced by the ClusterResourceSet object and with
+# the CNI resource defined in the test config file
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "cni-${CLUSTER_NAME}-crs-0"
+data:
+  kindnet.yaml: |
+    # kindnetd networking manifest
+    ---
+    kind: ClusterRole
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: kindnet
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - nodes
+        verbs:
+          - list
+          - watch
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - configmaps
+        verbs:
+          - get
+    ---
+    kind: ClusterRoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: kindnet
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: kindnet
+    subjects:
+      - kind: ServiceAccount
+        name: kindnet
+        namespace: kube-system
+    ---
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: kindnet
+      namespace: kube-system
+    ---
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: kindnet
+      namespace: kube-system
+      labels:
+        tier: node
+        app: kindnet
+        k8s-app: kindnet
+    spec:
+      selector:
+        matchLabels:
+          app: kindnet
+      template:
+        metadata:
+          labels:
+            tier: node
+            app: kindnet
+            k8s-app: kindnet
+        spec:
+          hostNetwork: true
+          tolerations:
+            - operator: Exists
+              effect: NoSchedule
+          serviceAccountName: kindnet
+          containers:
+            - name: kindnet-cni
+              image: kindest/kindnetd:v20230330-48f316cd
+              env:
+                - name: HOST_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+                - name: POD_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: POD_SUBNET
+                  value: '192.168.0.0/16'
+              volumeMounts:
+                - name: cni-cfg
+                  mountPath: /etc/cni/net.d
+                - name: xtables-lock
+                  mountPath: /run/xtables.lock
+                  readOnly: false
+                - name: lib-modules
+                  mountPath: /lib/modules
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "50Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "50Mi"
+              securityContext:
+                privileged: false
+                capabilities:
+                  add: ["NET_RAW", "NET_ADMIN"]
+          volumes:
+            - name: cni-bin
+              hostPath:
+                path: /opt/cni/bin
+                type: DirectoryOrCreate
+            - name: cni-cfg
+              hostPath:
+                path: /etc/cni/net.d
+                type: DirectoryOrCreate
+            - name: xtables-lock
+              hostPath:
+                path: /run/xtables.lock
+                type: FileOrCreate
+            - name: lib-modules
+              hostPath:
+                path: /lib/modules
