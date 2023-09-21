@@ -3,6 +3,8 @@ kind: DockerCluster
 metadata:
   name: cluster1
   namespace: default
+  annotations:
+    "helm.sh/resource-policy": keep
 spec:
   failureDomains:
     fd1:
@@ -62,10 +64,10 @@ spec:
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: KubeadmControlPlane
 metadata:
-  labels:
-    kcp-adoption.step2: ""
   name: cluster1-control-plane
   namespace: default
+  annotations:
+    "helm.sh/resource-policy": keep
 spec:
   kubeadmConfigSpec:
     clusterConfiguration:
@@ -127,6 +129,8 @@ kind: MachineDeployment
 metadata:
   name: cluster1-md-0
   namespace: default
+  annotations:
+    "helm.sh/resource-policy": keep
 spec:
   clusterName: cluster1
   replicas: 1
