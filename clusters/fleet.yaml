@@ -2,4 +2,4 @@ namespace: default
 dependsOn:
   - selector:
       matchLabels:
-        classes: true
+        classes: "true"
