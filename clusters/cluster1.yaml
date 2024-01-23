@@ -1,0 +1,54 @@
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: "cluster1"
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks: ["192.168.0.0/16"]
+  infrastructureRef:
+    kind: AWSManagedCluster
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+    name: "cluster1-control-plane"
+  controlPlaneRef:
+    kind: AWSManagedControlPlane
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+    name: "cluster1-control-plane"
+---
+kind: AWSManagedCluster
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+metadata:
+  name: "cluster1"
+spec: {}
+---
+kind: AWSManagedControlPlane
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+metadata:
+  name: "cluster1-control-plane"
+spec:
+  region: "eu-west-2"
+  version: "v1.28"
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: "cluster1-pool-0"
+spec:
+  clusterName: "cluster1"
+  template:
+    spec:
+      clusterName: "cluster1"
+      bootstrap: 
+        dataSecretName: ""
+      infrastructureRef:
+        name: "cluster1-pool-0"
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+        kind: AWSManagedMachinePool
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSManagedMachinePool
+metadata:
+  name: "cluster1-pool-0"
+spec:
+  instanceType: t3.medium
