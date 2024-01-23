@@ -1,10 +1,1 @@
 namespace: default
-
-diff:
-  comparePatches:
-  - apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-    kind: AWSManagedCluster
-    name: cluster1
-    namespace: default
-    operations:
-    - {"op":"remove", "path":"/spec/failureDomains"}
