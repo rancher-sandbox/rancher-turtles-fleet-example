@@ -5,6 +5,8 @@ This repository can be used to import clusters into Rancher using Fleet. There a
 - **main (this branch)** - used for for importing cluster definitions where all clusters within a namespace are automatically imported into Rancher.
 - **[per-cluster-import](https://github.com/rancher-sandbox/rancher-turtles-fleet-example/tree/per-cluster-import)** - used for importing cluster definitions where individual clusters are marked for auto-importing into Rancher.
 - **[templates](https://github.com/rancher-sandbox/rancher-turtles-fleet-example/tree/templates)** - contains Cluster API templates that are used by the Rancher Turtles documentation.
+- **[cluster-class](https://github.com/rancher-sandbox/rancher-turtles-fleet-example/tree/clusterclass)** - contains a sample using ClusterClass
+- **[aws](https://github.com/rancher-sandbox/rancher-turtles-fleet-example/tree/aws)** - contains a sample using AWS.
 
 Switch to the branch to read further information.
 
