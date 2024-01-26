@@ -1,4 +1,4 @@
-namespace: default
+namespace: fleet-default
 dependsOn:
   - selector:
       matchLabels:
