@@ -133,7 +133,7 @@ metadata:
     "helm.sh/resource-policy": keep
 spec:
   clusterName: cluster1
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels: null
   template:
