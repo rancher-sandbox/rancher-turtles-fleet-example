@@ -29,6 +29,7 @@ kind: Cluster
 metadata:
   labels:
     cni: cluster1-crs-0
+    env: dev
   name: cluster1
   namespace: default
 spec:
