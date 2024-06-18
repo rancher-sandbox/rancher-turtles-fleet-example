@@ -6,30 +6,13 @@ metadata:
   annotations:
     "helm.sh/resource-policy": keep
 spec:
-  failureDomains:
-    fd1:
-      controlPlane: true
-    fd2:
-      controlPlane: true
-    fd3:
-      controlPlane: true
-    fd4:
-      controlPlane: false
-    fd5:
-      controlPlane: false
-    fd6:
-      controlPlane: false
-    fd7:
-      controlPlane: false
-    fd8:
-      controlPlane: false
+  loadBalancer:
+    customHAProxyConfigTemplateRef:
+      name: cluster1-lb-config
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  labels:
-    cni: cluster1-crs-0
-    env: dev
   name: cluster1
   namespace: default
 spec:
@@ -43,7 +26,7 @@ spec:
       - 10.10.0.0/16
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-    kind: KubeadmControlPlane
+    kind: RKE2ControlPlane
     name: cluster1-control-plane
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
@@ -58,46 +41,33 @@ metadata:
 spec:
   template:
     spec:
-      extraMounts:
-      - containerPath: /var/run/docker.sock
-        hostPath: /var/run/docker.sock
+      customImage: kindest/node:v1.26.0
+      bootstrapTimeout: 15m
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-kind: KubeadmControlPlane
+kind: RKE2ControlPlane
 metadata:
   name: cluster1-control-plane
   namespace: default
   annotations:
     "helm.sh/resource-policy": keep
-spec:
-  kubeadmConfigSpec:
-    clusterConfiguration:
-      apiServer:
-        certSANs:
-        - localhost
-        - 127.0.0.1
-        - 0.0.0.0
-        - host.docker.internal
-      controllerManager:
-        extraArgs:
-          enable-hostpath-provisioner: "true"
-    initConfiguration:
-      nodeRegistration:
-        criSocket: unix:///var/run/containerd/containerd.sock
-        kubeletExtraArgs:
-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
-    joinConfiguration:
-      nodeRegistration:
-        criSocket: unix:///var/run/containerd/containerd.sock
-        kubeletExtraArgs:
-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
-  machineTemplate:
-    infrastructureRef:
-      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-      kind: DockerMachineTemplate
-      name: cluster1-control-plane
+spec: 
   replicas: 1
-  version: v1.26.4
+  registrationMethod: internal-first
+  rolloutStrategy:
+    rollingUpdate:
+      maxSurge: 1
+    type: RollingUpdate
+  serverConfig:
+    disableComponents:
+      kubernetesComponents:
+      - cloudController
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerMachineTemplate
+    name:  cluster1-control-plane
+  nodeDrainTimeout: 30s
+  version: v1.26.4+rke2r1
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
@@ -107,23 +77,14 @@ metadata:
 spec:
   template:
     spec:
-      extraMounts:
-      - containerPath: /var/run/docker.sock
-        hostPath: /var/run/docker.sock
+      customImage: kindest/node:v1.26.0
+      bootstrapTimeout: 15m
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-kind: KubeadmConfigTemplate
+kind: RKE2ConfigTemplate
 metadata:
   name: cluster1-md-0
   namespace: default
-spec:
-  template:
-    spec:
-      joinConfiguration:
-        nodeRegistration:
-          criSocket: unix:///var/run/containerd/containerd.sock
-          kubeletExtraArgs:
-            eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -142,150 +103,76 @@ spec:
       bootstrap:
         configRef:
           apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-          kind: KubeadmConfigTemplate
+          kind: RKE2ConfigTemplate
           name: cluster1-md-0
       clusterName: cluster1
-      failureDomain: fd4
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: DockerMachineTemplate
         name: cluster1-md-0
-      version: v1.26.4
----
-apiVersion: addons.cluster.x-k8s.io/v1beta1
-kind: ClusterResourceSet
-metadata:
-  name: cluster1-crs-0
-  namespace: default
-spec:
-  clusterSelector:
-    matchLabels:
-      cni: cluster1-crs-0
-  resources:
-  - kind: ConfigMap
-    name: cni-cluster1-crs-0
-  strategy: ApplyOnce
+      version: v1.26.4+rke2r1
 ---
 apiVersion: v1
 data:
-  kindnet.yaml: |
-    # kindnetd networking manifest
-    ---
-    kind: ClusterRole
-    apiVersion: rbac.authorization.k8s.io/v1
-    metadata:
-      name: kindnet
-    rules:
-      - apiGroups:
-          - ""
-        resources:
-          - nodes
-        verbs:
-          - list
-          - watch
-          - patch
-      - apiGroups:
-          - ""
-        resources:
-          - configmaps
-        verbs:
-          - get
-    ---
-    kind: ClusterRoleBinding
-    apiVersion: rbac.authorization.k8s.io/v1
-    metadata:
-      name: kindnet
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: ClusterRole
-      name: kindnet
-    subjects:
-      - kind: ServiceAccount
-        name: kindnet
-        namespace: kube-system
-    ---
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: kindnet
-      namespace: kube-system
-    ---
-    apiVersion: apps/v1
-    kind: DaemonSet
-    metadata:
-      name: kindnet
-      namespace: kube-system
-      labels:
-        tier: node
-        app: kindnet
-        k8s-app: kindnet
-    spec:
-      selector:
-        matchLabels:
-          app: kindnet
-      template:
-        metadata:
-          labels:
-            tier: node
-            app: kindnet
-            k8s-app: kindnet
-        spec:
-          hostNetwork: true
-          tolerations:
-            - operator: Exists
-              effect: NoSchedule
-          serviceAccountName: kindnet
-          containers:
-            - name: kindnet-cni
-              image: kindest/kindnetd:v20230330-48f316cd
-              env:
-                - name: HOST_IP
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: status.hostIP
-                - name: POD_IP
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: status.podIP
-                - name: POD_SUBNET
-                  value: '192.168.0.0/16'
-              volumeMounts:
-                - name: cni-cfg
-                  mountPath: /etc/cni/net.d
-                - name: xtables-lock
-                  mountPath: /run/xtables.lock
-                  readOnly: false
-                - name: lib-modules
-                  mountPath: /lib/modules
-                  readOnly: true
-              resources:
-                requests:
-                  cpu: "100m"
-                  memory: "50Mi"
-                limits:
-                  cpu: "100m"
-                  memory: "50Mi"
-              securityContext:
-                privileged: false
-                capabilities:
-                  add: ["NET_RAW", "NET_ADMIN"]
-          volumes:
-            - name: cni-bin
-              hostPath:
-                path: /opt/cni/bin
-                type: DirectoryOrCreate
-            - name: cni-cfg
-              hostPath:
-                path: /etc/cni/net.d
-                type: DirectoryOrCreate
-            - name: xtables-lock
-              hostPath:
-                path: /run/xtables.lock
-                type: FileOrCreate
-            - name: lib-modules
-              hostPath:
-                path: /lib/modules
+  value: |-
+    # generated by kind
+    global
+      log /dev/log local0
+      log /dev/log local1 notice
+      daemon
+      # limit memory usage to approximately 18 MB
+      # (see https://github.com/kubernetes-sigs/kind/pull/3115)
+      maxconn 100000
+
+    resolvers docker
+      nameserver dns 127.0.0.11:53
+
+    defaults
+      log global
+      mode tcp
+      option dontlognull
+      # TODO: tune these
+      timeout connect 5000
+      timeout client 50000
+      timeout server 50000
+      # allow to boot despite dns don't resolve backends
+      default-server init-addr none
+
+    frontend stats
+      bind *:8404
+      stats enable
+      stats uri /
+      stats refresh 10s
+
+    frontend control-plane
+      bind *:{{ .FrontendControlPlanePort }}
+      {{ if .IPv6 -}}
+      bind :::{{ .FrontendControlPlanePort }};
+      {{- end }}
+      default_backend kube-apiservers
+
+    backend kube-apiservers
+      option httpchk GET /healthz
+      http-check expect status 401
+      # TODO: we should be verifying (!)
+      {{range $server, $address := .BackendServers}}
+      server {{ $server }} {{ JoinHostPort $address $.BackendControlPlanePort }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
+      {{- end}}
+
+    frontend rke2-join
+      bind *:9345
+      {{ if .IPv6 -}}
+      bind :::9345;
+      {{- end }}
+      default_backend rke2-servers
+
+    backend rke2-servers
+      option httpchk GET /v1-rke2/readyz
+      http-check expect status 403
+      {{range $server, $address := .BackendServers}}
+      server {{ $server }} {{ $address }}:9345 check check-ssl verify none
+      {{- end}}
 kind: ConfigMap
 metadata:
-  name: cni-cluster1-crs-0
+  name: cluster1-lb-config
   namespace: default
