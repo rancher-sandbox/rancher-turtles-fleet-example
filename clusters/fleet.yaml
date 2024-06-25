@@ -1,10 +1,22 @@
-namespace: default
+namespace: fleet-default
 
 diff:
   comparePatches:
   - apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: DockerCluster
     name: cluster1
-    namespace: default
+    namespace: fleet-default
     operations:
-    - {"op":"remove", "path":"/spec/failureDomains"}
+    - {"op":"remove", "path":"/spec/loadBalancer"}
+  - apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerMachineTemplate
+    name: cluster1-control-plane
+    namespace: fleet-default
+    operations:
+    - {"op":"remove", "path":"/spec/template/spec/bootstrapTimeout"}
+  - apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerMachineTemplate
+    name: cluster1-md-0
+    namespace: fleet-default
+    operations:
+    - {"op":"remove", "path":"/spec/template/spec/bootstrapTimeout"}
