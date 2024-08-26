@@ -1,40 +1,30 @@
+---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
   name: cluster1
   namespace: default
-  labels:
-    cluster-api.cattle.io/rancher-auto-import: "true"
 spec:
   clusterNetwork:
     pods:
       cidrBlocks:
-      - 192.168.0.0/16
+      - 10.45.0.0/16
     serviceDomain: cluster.local
     services:
       cidrBlocks:
-      - 10.128.0.0/12
+      - 10.46.0.0/16
   topology:
     class: quick-start
+    version: v1.29.7+rke2r1
     controlPlane:
       metadata: {}
-      replicas: 3
-    variables:
-    - name: imageRepository
-      value: ""
-    - name: etcdImageTag
-      value: ""
-    - name: coreDNSImageTag
-      value: ""
-    - name: podSecurityStandard
-      value:
-        audit: restricted
-        enabled: true
-        enforce: baseline
-        warn: restricted
-    version: v1.28.0
+      replicas: 1
     workers:
       machineDeployments:
       - class: default-worker
         name: md-0
-        replicas: 3
+        replicas: 2
+    variables:
+      - name: dockerKindImage
+        value: kindest/node:v1.29.7
+
