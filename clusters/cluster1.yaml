@@ -176,3 +176,5 @@ kind: ConfigMap
 metadata:
   name: cluster1-lb-config
   namespace: default
+  annotations:
+    "helm.sh/resource-policy": keep
