@@ -4,6 +4,8 @@ kind: Cluster
 metadata:
   name: cluster1
   namespace: default
+  labels:
+    cluster-api.cattle.io/rancher-auto-import: "true"
 spec:
   clusterNetwork:
     pods:
