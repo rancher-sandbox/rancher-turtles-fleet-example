@@ -124,7 +124,7 @@ spec:
     name: cluster-identity-secret
     namespace: default
   tenantID: ${AZURE_TENANT_ID}
-  type: ${CLUSTER_IDENTITY_TYPE}
+  type: ServicePrincipal
 ---
 apiVersion: v1
 stringData:
