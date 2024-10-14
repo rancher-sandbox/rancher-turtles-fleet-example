@@ -21,7 +21,9 @@ spec:
         bootstrap:
           ref:
             apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-            kind: KubeadmConfigTemplate
+            # a bootstrap object is required to satisfy CAPI's webhooks but it won't affect provisioning
+            # this is a limitation of core CAPI, check the issue here: https://github.com/kubernetes-sigs/cluster-api/issues/10943
+            kind: RKE2ConfigTemplate
             name: ${CLUSTER_NAME}-pool0
         infrastructure:
           ref:
@@ -33,7 +35,7 @@ spec:
         bootstrap:
           ref:
             apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-            kind: KubeadmConfigTemplate
+            kind: RKE2ConfigTemplate
             name: ${CLUSTER_NAME}-pool1
         infrastructure:
           ref:
@@ -91,7 +93,7 @@ spec:
       sku: ${AZURE_NODE_MACHINE_TYPE}
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-kind: KubeadmConfigTemplate
+kind: RKE2ConfigTemplate
 metadata:
   name: ${CLUSTER_NAME}-pool0
   namespace: default
@@ -100,7 +102,7 @@ spec:
     spec: {}
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-kind: KubeadmConfigTemplate
+kind: RKE2ConfigTemplate
 metadata:
   name: ${CLUSTER_NAME}-pool1
   namespace: default
