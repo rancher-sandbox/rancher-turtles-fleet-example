@@ -91,6 +91,9 @@ kind: RKE2ConfigTemplate
 metadata:
   name: cluster1-md-0
   namespace: default
+spec:
+  template:
+    spec: {}
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
