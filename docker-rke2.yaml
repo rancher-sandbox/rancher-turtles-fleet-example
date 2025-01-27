@@ -4,6 +4,7 @@ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerCluster
 metadata:
   name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
   annotations:
     "helm.sh/resource-policy": keep
 spec:
@@ -15,6 +16,7 @@ apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
   name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
 spec:
   clusterNetwork:
     pods:
@@ -37,7 +39,7 @@ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-control-plane
-  namespace: default
+  namespace: ${NAMESPACE}
 spec:
   template:
     spec:
@@ -48,7 +50,7 @@ apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: RKE2ControlPlane
 metadata:
   name: ${CLUSTER_NAME}-control-plane
-  namespace: default
+  namespace: ${NAMESPACE}
   annotations:
     "helm.sh/resource-policy": keep
 spec: 
@@ -73,7 +75,7 @@ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: default
+  namespace: ${NAMESPACE}
 spec:
   template:
     spec:
@@ -84,13 +86,13 @@ apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: RKE2ConfigTemplate
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: default
+  namespace: ${NAMESPACE}
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: default
+  namespace: ${NAMESPACE}
   annotations:
     "helm.sh/resource-policy": keep
 spec:
@@ -175,4 +177,4 @@ data:
 kind: ConfigMap
 metadata:
   name: ${CLUSTER_NAME}-lb-config
-  namespace: default
+  namespace: ${NAMESPACE}
