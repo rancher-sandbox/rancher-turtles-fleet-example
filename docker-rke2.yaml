@@ -61,6 +61,9 @@ spec:
       maxSurge: 1
     type: RollingUpdate
   serverConfig:
+    kubeAPIServer:
+      extraArgs:
+      - --anonymous-auth=true
     disableComponents:
       kubernetesComponents:
       - cloudController
