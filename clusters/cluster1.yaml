@@ -15,15 +15,19 @@ kind: Cluster
 metadata:
   name: cluster1
   namespace: default
+  annotations:
+    cluster-api.cattle.io/upstream-system-agent: "true"
+  labels:
+    cni: cluster1-crs-0
 spec:
   clusterNetwork:
     pods:
       cidrBlocks:
       - 10.1.0.0/16
-    serviceDomain: cluster.local
     services:
       cidrBlocks:
       - 10.10.0.0/16
+    serviceDomain: cluster.local
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
     kind: RKE2ControlPlane
@@ -41,7 +45,7 @@ metadata:
 spec:
   template:
     spec:
-      customImage: kindest/node:v1.26.0
+      customImage: kindest/node:v1.31.0
       bootstrapTimeout: 15m
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
@@ -53,15 +57,24 @@ metadata:
     "helm.sh/resource-policy": keep
 spec: 
   replicas: 1
-  registrationMethod: internal-first
+  version: v1.31.0+rke2r1
   rolloutStrategy:
     rollingUpdate:
       maxSurge: 1
     type: RollingUpdate
   serverConfig:
+    cni: calico
+    kubeAPIServer:
+      extraArgs:
+      - --anonymous-auth=true
     disableComponents:
+      pluginComponents:
+       - rke2-ingress-nginx
       kubernetesComponents:
       - cloudController
+  agentConfig:
+    nodeAnnotations:
+      test: "true"
   machineTemplate:
     infrastructureRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
@@ -73,7 +86,6 @@ spec:
     kind: DockerMachineTemplate
     name:  cluster1-control-plane
   nodeDrainTimeout: 30s
-  version: v1.26.4+rke2r1
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
@@ -83,7 +95,7 @@ metadata:
 spec:
   template:
     spec:
-      customImage: kindest/node:v1.26.0
+      customImage: kindest/node:v1.31.0
       bootstrapTimeout: 15m
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
@@ -91,9 +103,7 @@ kind: RKE2ConfigTemplate
 metadata:
   name: cluster1-md-0
   namespace: default
-spec:
-  template:
-    spec: {}
+spec: {}
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -106,20 +116,21 @@ spec:
   clusterName: cluster1
   replicas: 1
   selector:
-    matchLabels: null
+    matchLabels:
+      cluster.x-k8s.io/cluster-name: cluster1
   template:
     spec:
+      version: v1.31.0+rke2r1
+      clusterName: cluster1
       bootstrap:
         configRef:
           apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
           kind: RKE2ConfigTemplate
           name: cluster1-md-0
-      clusterName: cluster1
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: DockerMachineTemplate
         name: cluster1-md-0
-      version: v1.26.4+rke2r1
 ---
 apiVersion: v1
 data:
@@ -148,10 +159,12 @@ data:
       default-server init-addr none
 
     frontend stats
+      mode http
       bind *:8404
       stats enable
-      stats uri /
-      stats refresh 10s
+      stats uri /stats
+      stats refresh 1s
+      stats admin if TRUE
 
     frontend control-plane
       bind *:{{ .FrontendControlPlanePort }}
@@ -162,10 +175,9 @@ data:
 
     backend kube-apiservers
       option httpchk GET /healthz
-      http-check expect status 401
-      # TODO: we should be verifying (!)
-      {{range $server, $address := .BackendServers}}
-      server {{ $server }} {{ JoinHostPort $address $.BackendControlPlanePort }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
+
+      {{range $server, $backend := .BackendServers }}
+      server {{ $server }} {{ JoinHostPort $backend.Address $.BackendControlPlanePort }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
       {{- end}}
 
     frontend rke2-join
@@ -178,8 +190,8 @@ data:
     backend rke2-servers
       option httpchk GET /v1-rke2/readyz
       http-check expect status 403
-      {{range $server, $address := .BackendServers}}
-      server {{ $server }} {{ $address }}:9345 check check-ssl verify none
+      {{range $server, $backend := .BackendServers }}
+      server {{ $server }} {{ $backend.Address }}:9345 check check-ssl verify none
       {{- end}}
 kind: ConfigMap
 metadata:
