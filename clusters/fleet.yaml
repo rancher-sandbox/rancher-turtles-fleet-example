@@ -1,10 +1,10 @@
-namespace: default
+namespace: capi-clusters
 
 diff:
   comparePatches:
   - apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: DockerCluster
-    name: cluster1
-    namespace: default
+    name: capi-cl1
+    namespace: capi-clusters
     operations:
     - {"op":"remove", "path":"/spec/failureDomains"}

@@ -14,6 +14,6 @@ Switch to the branch to read further information.
 
 The [clusters](./clusters/) folder contains the definition for the clusters that you want to create and have imported into Rancher Manager. These definitions can be created using **clusterctl** or hand crafted. See the [Rancher Turtles documentation](https://rancher.github.io/turtles-docs/) for further details.
 
-The [fleet.yaml](./clusters/fleet.yaml) file contains configuration used by Fleet when creating bundles. Specifically in this file we are declaring that the cluster definitions should be placed in a namespace called **default**.
+The [fleet.yaml](./clusters/fleet.yaml) file contains configuration used by Fleet when creating bundles. Specifically in this file we are declaring that the cluster definitions should be placed in a namespace called **capi-clusters**.
 
-You will need to add the **cluster-api.cattle.io/rancher-auto-import** label with a value of **true** to the **default** namespace to have the cluster auto-imported.
+You will need to add the **cluster-api.cattle.io/rancher-auto-import** label with a value of **true** to the **capi-clusters** namespace to have the cluster auto-imported.
