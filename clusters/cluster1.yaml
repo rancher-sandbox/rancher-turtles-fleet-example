@@ -1,20 +1,20 @@
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerCluster
 metadata:
-  name: cluster1
-  namespace: default
+  name: capi-cl1
+  namespace: capi-clusters
   annotations:
     "helm.sh/resource-policy": keep
 spec:
   loadBalancer:
     customHAProxyConfigTemplateRef:
-      name: cluster1-lb-config
+      name: capi-cl1-lb-config
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: cluster1
-  namespace: default
+  name: capi-cl1
+  namespace: capi-clusters
 spec:
   clusterNetwork:
     pods:
@@ -27,17 +27,17 @@ spec:
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
     kind: RKE2ControlPlane
-    name: cluster1-control-plane
+    name: capi-cl1-cp
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: DockerCluster
-    name: cluster1
+    name: capi-cl1
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
 metadata:
-  name: cluster1-control-plane
-  namespace: default
+  name: capi-cl1-cp
+  namespace: capi-clusters
 spec:
   template:
     spec:
@@ -47,8 +47,8 @@ spec:
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: RKE2ControlPlane
 metadata:
-  name: cluster1-control-plane
-  namespace: default
+  name: capi-cl1-cp
+  namespace: capi-clusters
   annotations:
     "helm.sh/resource-policy": keep
 spec: 
@@ -66,20 +66,20 @@ spec:
     infrastructureRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
       kind: DockerMachineTemplate
-      name:  cluster1-control-plane
+      name:  capi-cl1-cp
     nodeDrainTimeout: 30s
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: DockerMachineTemplate
-    name:  cluster1-control-plane
+    name:  capi-cl1-cp
   nodeDrainTimeout: 30s
   version: v1.26.4+rke2r1
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DockerMachineTemplate
 metadata:
-  name: cluster1-md-0
-  namespace: default
+  name: capi-cl1-md0
+  namespace: capi-clusters
 spec:
   template:
     spec:
@@ -89,8 +89,8 @@ spec:
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: RKE2ConfigTemplate
 metadata:
-  name: cluster1-md-0
-  namespace: default
+  name: capi-cl1-md0
+  namespace: capi-clusters
 spec:
   template:
     spec: {}
@@ -98,12 +98,12 @@ spec:
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
 metadata:
-  name: cluster1-md-0
-  namespace: default
+  name: capi-cl1-md0
+  namespace: capi-clusters
   annotations:
     "helm.sh/resource-policy": keep
 spec:
-  clusterName: cluster1
+  clusterName: capi-cl1
   replicas: 1
   selector:
     matchLabels: null
@@ -113,12 +113,12 @@ spec:
         configRef:
           apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
           kind: RKE2ConfigTemplate
-          name: cluster1-md-0
-      clusterName: cluster1
+          name: capi-cl1-md0
+      clusterName: capi-cl1
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: DockerMachineTemplate
-        name: cluster1-md-0
+        name: capi-cl1-md0
       version: v1.26.4+rke2r1
 ---
 apiVersion: v1
@@ -183,7 +183,7 @@ data:
       {{- end}}
 kind: ConfigMap
 metadata:
-  name: cluster1-lb-config
-  namespace: default
+  name: capi-cl1-lb-config
+  namespace: capi-clusters
   annotations:
     "helm.sh/resource-policy": keep
