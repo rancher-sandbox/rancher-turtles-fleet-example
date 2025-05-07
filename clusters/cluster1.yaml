@@ -1,125 +1,38 @@
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-kind: DockerCluster
-metadata:
-  name: capi-cl1
-  namespace: capi-clusters
-  annotations:
-    "helm.sh/resource-policy": keep
-spec:
-  loadBalancer:
-    customHAProxyConfigTemplateRef:
-      name: capi-cl1-lb-config
----
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: capi-cl1
+  name: docker-rke2-example
   namespace: capi-clusters
+  labels:
+    cluster-api.cattle.io/rancher-auto-import: "true"
+    cni: calico
+  annotations:
+    cluster-api.cattle.io/upstream-system-agent: "true"
 spec:
   clusterNetwork:
     pods:
       cidrBlocks:
-      - 10.1.0.0/16
-    serviceDomain: cluster.local
+      - 192.168.0.0/16
     services:
       cidrBlocks:
-      - 10.10.0.0/16
-  controlPlaneRef:
-    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-    kind: RKE2ControlPlane
-    name: capi-cl1-cp
-  infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-    kind: DockerCluster
-    name: capi-cl1
----
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-kind: DockerMachineTemplate
-metadata:
-  name: capi-cl1-cp
-  namespace: capi-clusters
-spec:
-  template:
-    spec:
-      customImage: kindest/node:v1.26.0
-      bootstrapTimeout: 15m
----
-apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-kind: RKE2ControlPlane
-metadata:
-  name: capi-cl1-cp
-  namespace: capi-clusters
-  annotations:
-    "helm.sh/resource-policy": keep
-spec: 
-  replicas: 1
-  registrationMethod: internal-first
-  rolloutStrategy:
-    rollingUpdate:
-      maxSurge: 1
-    type: RollingUpdate
-  serverConfig:
-    disableComponents:
-      kubernetesComponents:
-      - cloudController
-  machineTemplate:
-    infrastructureRef:
-      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-      kind: DockerMachineTemplate
-      name:  capi-cl1-cp
-    nodeDrainTimeout: 30s
-  infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-    kind: DockerMachineTemplate
-    name:  capi-cl1-cp
-  nodeDrainTimeout: 30s
-  version: v1.26.4+rke2r1
----
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-kind: DockerMachineTemplate
-metadata:
-  name: capi-cl1-md0
-  namespace: capi-clusters
-spec:
-  template:
-    spec:
-      customImage: kindest/node:v1.26.0
-      bootstrapTimeout: 15m
----
-apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-kind: RKE2ConfigTemplate
-metadata:
-  name: capi-cl1-md0
-  namespace: capi-clusters
-spec:
-  template:
-    spec: {}
----
-apiVersion: cluster.x-k8s.io/v1beta1
-kind: MachineDeployment
-metadata:
-  name: capi-cl1-md0
-  namespace: capi-clusters
-  annotations:
-    "helm.sh/resource-policy": keep
-spec:
-  clusterName: capi-cl1
-  replicas: 1
-  selector:
-    matchLabels: null
-  template:
-    spec:
-      bootstrap:
-        configRef:
-          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-          kind: RKE2ConfigTemplate
-          name: capi-cl1-md0
-      clusterName: capi-cl1
-      infrastructureRef:
-        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-        kind: DockerMachineTemplate
-        name: capi-cl1-md0
-      version: v1.26.4+rke2r1
+      - 10.96.0.0/24
+    serviceDomain: cluster.local
+  topology:
+    class: docker-rke2-example
+    classNamespace: capi-clusters
+    controlPlane:
+      replicas: 1
+    variables:
+    - name: rke2CNI
+      value: none
+    - name: dockerImage
+      value: kindest/node:v1.31.6
+    version: v1.31.6+rke2r1
+    workers:
+      machineDeployments:
+      - class: default-worker
+        name: md-0
+        replicas: 1
 ---
 apiVersion: v1
 data:
@@ -148,10 +61,12 @@ data:
       default-server init-addr none
 
     frontend stats
+      mode http
       bind *:8404
       stats enable
-      stats uri /
-      stats refresh 10s
+      stats uri /stats
+      stats refresh 1s
+      stats admin if TRUE
 
     frontend control-plane
       bind *:{{ .FrontendControlPlanePort }}
@@ -162,10 +77,9 @@ data:
 
     backend kube-apiservers
       option httpchk GET /healthz
-      http-check expect status 401
-      # TODO: we should be verifying (!)
-      {{range $server, $address := .BackendServers}}
-      server {{ $server }} {{ JoinHostPort $address $.BackendControlPlanePort }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
+
+      {{range $server, $backend := .BackendServers }}
+      server {{ $server }} {{ JoinHostPort $backend.Address $.BackendControlPlanePort }} check check-ssl verify none resolvers docker resolve-prefer {{ if $.IPv6 -}} ipv6 {{- else -}} ipv4 {{- end }}
       {{- end}}
 
     frontend rke2-join
@@ -178,12 +92,12 @@ data:
     backend rke2-servers
       option httpchk GET /v1-rke2/readyz
       http-check expect status 403
-      {{range $server, $address := .BackendServers}}
-      server {{ $server }} {{ $address }}:9345 check check-ssl verify none
+      {{range $server, $backend := .BackendServers }}
+      server {{ $server }} {{ $backend.Address }}:9345 check check-ssl verify none
       {{- end}}
 kind: ConfigMap
 metadata:
-  name: capi-cl1-lb-config
+  name: docker-rke2-lb-config
   namespace: capi-clusters
   annotations:
     "helm.sh/resource-policy": keep
